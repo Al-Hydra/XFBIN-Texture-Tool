@@ -1,0 +1,1 @@
+pyinstaller gui.pyw --onefile --icon icon.ico --collect-all sv_ttk 

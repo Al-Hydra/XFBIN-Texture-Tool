@@ -1,0 +1,1 @@
+nuitka gui.pyw --onefile --enable-plugin=tk-inter windows-icon-from-ico= icon.ico

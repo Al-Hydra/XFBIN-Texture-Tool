@@ -1,0 +1,6 @@
+[submodule "utils/PyBinaryReader"]
+	path = utils/PyBinaryReader
+	url = https://github.com/SutandoTsukai181/PyBinaryReader
+[submodule "utils/xfbin_lib"]
+	path = utils/xfbin_lib
+	url = https://github.com/superuser590/xfbin_lib

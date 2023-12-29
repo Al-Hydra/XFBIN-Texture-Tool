@@ -122,6 +122,57 @@ def read_dds(file):
         dds: DDS = br.read_struct(DDS)
     return dds
 
+
+def texture_565(texture_data, width, height):
+    texture_data = array('u', texture_data)
+    texture_data.byteswap()
+
+    return Image.frombytes('RGB', (width, height), texture_data.tobytes(), 'raw', 'BGR;16')
+
+
+def texture_5551(texture_data, width, height):
+    texture_data = array('u', texture_data)
+    texture_data.byteswap()
+
+    return Image.frombytes('RGBA', (width, height), texture_data.tobytes(), 'raw', 'BGRA;15')
+
+
+def texture_4444(texture_data, width, height):
+    texture_data = array('u', texture_data)
+    texture_data.byteswap()
+
+    image = Image.frombytes('RGBA', (width, height),
+                            texture_data.tobytes(), 'raw', 'RGBA;4B')
+    r, g, b, a = image.split()
+    return Image.merge('RGBA', (b, g, r, a))
+
+
+def texture_8888(texture_data, width, height):
+    image = Image.frombytes('RGBA', (width, height), texture_data, 'raw')
+    r, g, b, a = image.split()
+    return Image.merge('RGBA', (g, b, a, r))
+
+textures = list()
+CopiedTextures = list()
+
+@dataclass
+class Texture:
+    name: str
+    filePath: str
+    type: str
+    data: array
+    def __init__(self):
+        self.name = ""
+        self.filePath = ""
+        self.width = None
+        self.height = None
+        self.type = None
+        self.pixel_format = None
+        self.mipmap_count = None
+        self.data = None
+        self.chunk = None
+    
+
 def DDS_to_NutTexture(dds):
     dds: DDS
     nut = NutTexture()
@@ -256,7 +307,7 @@ def NutTexture_to_DDS(nuttex: NutTexture):
     return br.buffer()
 
 def write_dds(texture, path):
-    for i, tex in enumerate(texture.nut.textsures):
+    for i, tex in enumerate(texture.data.textures):
         save = f'{path}/{texture.name}_{i}.dds'
         print(f'Writing {save}')
         with open(save, 'wb') as f:
@@ -264,8 +315,8 @@ def write_dds(texture, path):
         f.close()
 
 
-def NutTexture_to_PNG(texture: NuccChunkTexture, path):
-    for i, tex in enumerate(texture.nut.textures):
+def NutTexture_to_PNG(texture: Texture, path):
+    for i, tex in enumerate(texture.data.textures):
         save = f'{path}/{texture.name}_{i}.png'
         print(f'Writing {save}')
         if tex.pixel_format == 0 or tex.pixel_format == 1 or tex.pixel_format == 2:
@@ -284,57 +335,6 @@ def NutTexture_to_PNG(texture: NuccChunkTexture, path):
             texture_8888(tex.texture_data, tex.width,
                          tex.height).save(save, 'PNG')
 
-
-def texture_565(texture_data, width, height):
-    texture_data = array('u', texture_data)
-    texture_data.byteswap()
-
-    return Image.frombytes('RGB', (width, height), texture_data.tobytes(), 'raw', 'BGR;16')
-
-
-def texture_5551(texture_data, width, height):
-    texture_data = array('u', texture_data)
-    texture_data.byteswap()
-
-    return Image.frombytes('RGBA', (width, height), texture_data.tobytes(), 'raw', 'BGRA;15')
-
-
-def texture_4444(texture_data, width, height):
-    texture_data = array('u', texture_data)
-    texture_data.byteswap()
-
-    image = Image.frombytes('RGBA', (width, height),
-                            texture_data.tobytes(), 'raw', 'RGBA;4B')
-    r, g, b, a = image.split()
-    return Image.merge('RGBA', (b, g, r, a))
-
-
-def texture_8888(texture_data, width, height):
-    image = Image.frombytes('RGBA', (width, height), texture_data, 'raw')
-    r, g, b, a = image.split()
-    return Image.merge('RGBA', (g, b, a, r))
-
-textures = list()
-CopiedTextures = list()
-
-@dataclass
-class Texture:
-    name: str
-    filePath: str
-    type: str
-    data: array
-    def __init__(self):
-        self.name = ""
-        self.filePath = ""
-        self.width = None
-        self.height = None
-        self.type = None
-        self.pixel_format = None
-        self.mipmap_count = None
-        self.data = None
-        self.chunk = None
-    
-    
 
 def copy_texture(texture: NuccChunkTexture):
     tex = copy.deepcopy(texture)

@@ -415,13 +415,31 @@ class App(tkinter.Tk):
     def export_xfbin(self):
         #export the selected xfbin
         selection = self.xfbin_list.selection()
-        if len(selection) > 0:
+
+        if len(selection) >= 2:
+            export_errors = []
+
+            items = [self.xfbin_list.item(i) for i in selection]
+            paths = fd.askdirectory(
+                title='Select a location to export the XFBINs')
+            if paths != '':
+                for i, item in enumerate(items):
+                    xfbin = xfbins[self.xfbin_list.index(selection[i])]
+                    path = paths + '/' + item['text'] + '.xfbin'
+                    try:
+                        write_xfbin(xfbin, path)
+                    except:
+                        export_errors.append(item['text'])
+
+                if len(export_errors) > 0:
+                    tkinter.messagebox.showerror(
+                        "Error", f"Error exporting the following XFBINs:\n{export_errors}")
+                else:
+                    tkinter.messagebox.showinfo(
+                        "Export XFBIN", "XFBINs exported successfully!")
+        elif len(selection) > 0:
             item = self.xfbin_list.item(selection[0])
             xfbin_index = self.xfbin_list.index(selection[0])
-            '''path = fd.asksaveasfilename(title='Select a location to export XFBIN',
-                                        filetypes=[("XFBIN", "*.xfbin")],
-                                        defaultextension=".xfbin",
-                                        initialfile=f"{self.xfbin_list.item(xfbin_index)['text']}.xfbin")'''
             
             path = fd.asksaveasfilename(title='Select a location to export XFBIN',
                                         filetypes=[("XFBIN", "*.xfbin")],
@@ -482,7 +500,7 @@ class App(tkinter.Tk):
                 title='Select a location to export the PNG texture',)
             if path != '':
                 for tex in selection:
-                    texture: NuccChunkTexture = textures[self.textures_list.index(
+                    texture: Texture = textures[self.textures_list.index(
                         tex)]
                     NutTexture_to_PNG(texture, path)
             # show message box

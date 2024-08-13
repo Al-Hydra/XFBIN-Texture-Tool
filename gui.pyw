@@ -407,8 +407,8 @@ class App(tkinter.Tk):
             texture_index = self.textures_list.index(active)
             texture = textures[texture_index]
 
-            texture.name = self.texture_name.get()
-            texture.filePath = self.texture_path.get()
+            texture.name = texture.chunk.name = self.texture_name.get()
+            texture.filePath = texture.chunk.filePath = self.texture_path.get()
 
             self.textures_list.item(active, text=texture.name)
 

@@ -465,9 +465,9 @@ def read_nut(path, name):
 
 def write_nut(texture, nut_path):
     nut_path = f'{nut_path}//{texture.name}.nut'
-    nut: Nut = texture.data
+    nut: BrNut = BrNut()
     br = BinaryReader(endianness=Endian.BIG)
-    br.write_struct(BrNut(), nut)
+    br.write_struct(nut, texture.data)
     with open(nut_path, 'wb') as f:
         f.write(br.buffer())
     print(f'Wrote {nut_path}')

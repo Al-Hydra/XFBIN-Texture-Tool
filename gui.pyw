@@ -76,8 +76,8 @@ class App(tkinter.Tk):
             row=0, column=1, sticky="nsew", padx=5, pady=5)
         self.export_texture.menu = Menu(self.export_texture, tearoff=0)
         self.export_texture['menu'] = self.export_texture.menu
-        self.export_texture.menu.add_command(
-            label="Export as NUT", command=self.export_nut)
+        '''self.export_texture.menu.add_command(
+            label="Export as NUT", command=self.export_nut)'''
         self.export_texture.menu.add_command(
             label="Export as DDS", command=self.export_dds)
         self.export_texture.menu.add_command(

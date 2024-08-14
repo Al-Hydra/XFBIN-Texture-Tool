@@ -14,3 +14,4 @@ icon.png
 build command nuitka.txt
 *.xfbin
 nut_unpacker.spec
+/gui.dist

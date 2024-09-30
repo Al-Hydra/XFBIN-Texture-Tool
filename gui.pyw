@@ -18,7 +18,7 @@ class App(tkinter.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("XFBIN Texture Editor")
+        self.title("XFBIN Texture Tool")
         self.geometry("1000x600")
         self.iconphoto(True, tkinter.PhotoImage(data=icon))
 
@@ -493,6 +493,7 @@ class App(tkinter.Tk):
 
     def export_png(self):
         texture = self.textures_list.selection()
+
         selection = [i for i in self.textures_list.selection(
         ) if self.textures_list.parent(i) == '']
         if len(selection) > 0:
@@ -502,13 +503,24 @@ class App(tkinter.Tk):
                 for tex in selection:
                     texture: Texture = textures[self.textures_list.index(
                         tex)]
-                    NutTexture_to_PNG(texture, path)
+                    if texture.type == "png":
+                        with open(path + '/' + texture.name + '.png', 'wb') as f:
+                            f.write(texture.data)
+                    
+                    elif tex.type == "dds":
+                        dds = BytesIO(texture.data)
+                        image = Image.open(dds)
+                        image.save(path + '/' + texture.name + '.png')
+                    
+                    else:
+                        NutTexture_to_PNG(texture, path)
             # show message box
             tkinter.messagebox.showinfo(
                 "Export PNG", "PNG exported successfully!")
         else:
             tkinter.messagebox.showerror(
                 "Error", "No texture selected to export")
+        
 
     def copy_tex(self):
         CopiedTextures.clear()

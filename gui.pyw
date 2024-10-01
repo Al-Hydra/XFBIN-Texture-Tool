@@ -507,7 +507,7 @@ class App(tkinter.Tk):
                         with open(path + '/' + texture.name + '.png', 'wb') as f:
                             f.write(texture.data)
                     
-                    elif tex.type == "dds":
+                    elif texture.type == "dds":
                         dds = BytesIO(texture.data)
                         image = Image.open(dds)
                         image.save(path + '/' + texture.name + '.png')

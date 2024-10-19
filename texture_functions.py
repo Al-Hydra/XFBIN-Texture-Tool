@@ -94,17 +94,22 @@ nut_pf_fourcc = {
 }
 
 nut_pf_bitmasks = {
-    (0xf800, 0x7e0, 0x1f, 0): 8,
     (0x7c00, 0x3e0, 0x1f, 0x8000): 6,
     (0x0f00, 0x00f0, 0x000f, 0xf000): 7,
+    (0xf800, 0x7e0, 0x1f, 0): 8,
+    (0x000000ff, 0x0000ff00, 0x0, 0x0) : 9,
+    (255, 0, 0, 65280): 5,
+    (0x000000ff, 0, 0, 0): 11,
     (0x00ff0000, 0x0000ff00, 0x000000ff, 0x0): 14,
     (0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000): 17,
 }
 
 nut_bpp = {
-    8: 2,
     6: 2,
     7: 2,
+    8: 2,
+    5: 4,
+    11: 4,
     14: 4,
     17: 4,
 }
@@ -152,8 +157,20 @@ def texture_8888(texture_data, width, height):
     r, g, b, a = image.split()
     return Image.merge('RGBA', (g, b, a, r))
 
+def texture_r8g8(texture_data, width, height):
+    texture_data = array('u', texture_data)
+
+    return Image.frombytes('LA', (width, height), texture_data.tobytes(), 'raw', 'LA')
+
+def texture_r8(texture_data, width, height):
+    texture_data = array('u', texture_data)
+    texture_data.byteswap()
+
+    return Image.frombytes('L', (width, height), texture_data.tobytes(), 'raw', 'L')
+
 textures = list()
 CopiedTextures = list()
+CopiedNutTextures = list()
 
 @dataclass
 class Texture:
@@ -187,7 +204,6 @@ def DDS_to_NutTexture(dds):
         for mip in dds.mipmaps:
             if len(mip) < 16:
                 mip += b'\x00' * (16 - len(mip))
-            print(len(mip))
             nut.mipmaps.append(mip)
             nut.texture_data += mip
     elif dds.header.pixel_format.bitmasks:
@@ -319,7 +335,7 @@ def NutTexture_to_PNG(texture: Texture, path):
     for i, tex in enumerate(texture.data.textures):
         save = f'{path}/{texture.name}_{i}.png'
         print(f'Writing {save}')
-        if tex.pixel_format == 0 or tex.pixel_format == 1 or tex.pixel_format == 2:
+        if tex.pixel_format in (0, 1, 2, 21, 22):
             dxt1 = NutTexture_to_DDS(tex)
             img = Image.open(io.BytesIO(dxt1)).save(save, 'PNG')
         elif tex.pixel_format == 6:
@@ -403,14 +419,6 @@ def create_binary_chunk(texture: Texture):
     tex.has_props = True
     tex.binary_data = texture.data
     return tex
-
-if __name__ == '__main__':
-    path = r"C:\Users\Ali\Documents\GitHub\nut-tools\dist\adv_exam_brt_I1.dds"
-    with open(path, 'rb') as f:
-        data = f.read()
-    with BinaryReader(data, Endian.BIG) as br:
-        dds: DDS = br.read_struct(DDS)
-    print(dds.header.pixel_format.fourCC)
 
 
 def check_texture(path):

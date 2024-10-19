@@ -57,12 +57,67 @@ class DDS(BrStruct):
                     width = max(1, width // 2)
                     height = max(1, height // 2)
                 self.texture_data = bytes(self.texture_data)
+            
+            elif self.header.pixel_format.fourCC in ('ATI1', 'BC4U', 'BC4S'):
+                self.mipmaps = list()
+                self.texture_data = bytearray()
+                width = self.header.width
+                height = self.header.height
+                if self.header.mipMapCount == 0:
+                    self.header.mipMapCount = 1
+                for i in range(self.header.mipMapCount):
+                    self.mipmaps.append(br.read_bytes(
+                        int((max(1, (width + 3) // 4)) * max(1, (height + 3) // 4) * 8)))
+
+                    self.texture_data.extend(self.mipmaps[i])
+                    # calculate next mip map size
+                    width = max(1, width // 2)
+                    height = max(1, height // 2)
+                self.texture_data = bytes(self.texture_data)
+            
+            elif self.header.pixel_format.fourCC in ('ATI2', 'BC5U', 'BC5S'):
+                self.mipmaps = list()
+                self.texture_data = bytearray()
+                width = self.header.width
+                height = self.header.height
+                if self.header.mipMapCount == 0:
+                    self.header.mipMapCount = 1
+                for i in range(self.header.mipMapCount):
+                    self.mipmaps.append(br.read_bytes(
+                        int((max(1, (width + 3) // 4)) * max(1, (height + 3) // 4) * 16)))
+
+                    self.texture_data.extend(self.mipmaps[i])
+                    # calculate next mip map size
+                    width = max(1, width // 2)
+                    height = max(1, height // 2)
+                self.texture_data = bytes(self.texture_data)
+            
 
         # uncompressed textures
         elif 'DDPF_RGB' in PixelFormat_Flags.values(self.header.pixel_format.flags):
             bitcount = self.header.pixel_format.rgbBitCount
             bitmasks = self.header.pixel_format.bitmasks
-            if bitmasks in ((0xf800, 0x7e0, 0x1f, 0), (0x7c00, 0x3e0, 0x1f, 0x8000), (0x0f00, 0x00f0, 0x000f, 0xf000), (0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000)):
+            if bitmasks in ((0xf800, 0x7e0, 0x1f, 0), (0x7c00, 0x3e0, 0x1f, 0x8000), (0x0f00, 0x00f0, 0x000f, 0xf000), (0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000), (0x00ff0000, 0x0000ff00, 0x000000ff, 0x0)):
+                self.mipmaps = list()
+                self.texture_data = bytearray()
+                width = self.header.width
+                height = self.header.height
+                if self.header.mipMapCount == 0:
+                    self.header.mipMapCount = 1
+                for i in range(self.header.mipMapCount):
+                    # calculate mip map size and append to list
+                    self.mipmaps.append(br.read_bytes(
+                        (width * bitcount + 7) // 8 * height))
+                    self.texture_data.extend(self.mipmaps[i])
+                    # calculate next mip map size
+                    width = max(1, width // 2)
+                    height = max(1, height // 2)
+                self.texture_data = bytes(self.texture_data)
+
+        else:
+            bitcount = self.header.pixel_format.rgbBitCount
+            bitmasks = self.header.pixel_format.bitmasks
+            if bitmasks in ((255, 65280, 0, 0), (255, 0, 0, 65280), (255,0,0,0)):
                 self.mipmaps = list()
                 self.texture_data = bytearray()
                 width = self.header.width
@@ -87,7 +142,7 @@ class DDS(BrStruct):
                 br.write_struct(DDS_DX10_Header(),
                                 dds.header.pixel_format.dx10_header)
 
-            if dds.header.pixel_format.fourCC in ('DXT1', 'DXT3', 'DXT5'):
+            if dds.header.pixel_format.fourCC in ('DXT1', 'DXT3', 'DXT5', 'ATI1', 'ATI2'):
                 br.write_bytes(dds.texture_data)
 
         elif 'DDPF_RGB' in PixelFormat_Flags.values(dds.header.pixel_format.flags):
@@ -423,7 +478,7 @@ class Misc_Flag2(IntEnum):
 
 
 if __name__ == '__main__':
-    path = r"C:\Users\Ali\Documents\GitHub\nut-tools\dist\adv_exam_brt_I1.dds"
+    path = ""
     with open(path, 'rb') as f:
         data = f.read()
     with BinaryReader(data, Endian.BIG) as br:

@@ -3,8 +3,9 @@ from io import BytesIO
 from tkinter import Grid, Menu, W
 from tkinter import filedialog as fd
 from tkinter import ttk
-
+import tkinterdnd2
 import sv_ttk
+import shlex
 from PIL import Image, ImageTk
 
 from dds import *
@@ -14,7 +15,7 @@ from utils.xfbin_lib.xfbin.structure.nut import Pixel_Formats
 from xfbin_functions import *
 
 
-class App(tkinter.Tk):
+class App(tkinterdnd2.Tk):
     def __init__(self):
         super().__init__()
 
@@ -107,6 +108,9 @@ class App(tkinter.Tk):
         self.xfbin_list.heading("#0", text="XFBIN Name")
         self.xfbin_list.column("#0", anchor=W, width=100)
         self.xfbin_list.bind("<<TreeviewSelect>>", self.update_texture_chunks)
+        self.xfbin_list.drop_target_register(tkinterdnd2.DND_FILES)
+        self.xfbin_list.dnd_bind('<<Drop>>', self.xfbin_on_drop)
+        self.xfbin_list.bind("<Button-1>", self.update_texture_chunks)
 
         # treeview
         self.textures_list = ttk.Treeview(
@@ -119,6 +123,8 @@ class App(tkinter.Tk):
         self.textures_list.heading("Count", text="Count")
         self.textures_list.column("Count", anchor='w', width=10, minwidth=10)
         self.textures_list.bind("<<TreeviewSelect>>", self.update_name_path)
+        self.textures_list.drop_target_register(tkinterdnd2.DND_FILES)
+        self.textures_list.dnd_bind('<<Drop>>', self.texture_on_drop)
 
         # configure the grid in the lists frame
         Grid.grid_columnconfigure(self.lists_frame, index=0, weight=1)
@@ -252,6 +258,10 @@ class App(tkinter.Tk):
 
         self.texture_menu = Menu(self.window, tearoff=0)
         self.texture_menu.add_command(
+            label="Copy Texture", command=self.copy_sub_tex)
+        self.texture_menu.add_command(
+            label="Paste Texture", command=self.paste_sub_tex)
+        self.texture_menu.add_command(
             label="Replace Texture (DDS)", command=self.replace_dds_texture)
         self.texture_menu.add_command(
             label="Replace Texture (PNG)", command=self.replace_png_texture)
@@ -275,10 +285,95 @@ class App(tkinter.Tk):
         self.textures_list.bind("<Button-3>", self.show_right_click_menu)
 
         # -----------------------------------------------------------------------------------------------------------------------
+    
+    def xfbin_on_drop(self, event):
+        files = []
+        start_reading = False
+        file_path = ""
+        for char in event.data:
+            if char == "{":
+                start_reading = True
+                continue
+            elif char == "}":
+                start_reading = False
+                if file_path:
+                    files.append(file_path)
+                    file_path = ""
+            elif start_reading:
+                file_path += char
+        
+        if len(files) > 0:
+            self.open_xfbin(files)
+    
 
-    def open_xfbin(self):
-        files = fd.askopenfilenames(
-            title='Select one or more XFBINs', filetypes=[("XFBIN", "*.xfbin")])
+    def xfbin_on_button1(self, event):
+        pass
+    
+
+    def texture_on_drop(self, event):
+        #check where files were dropped
+
+        #check if the files are textures
+        files = []
+        start_reading = False
+        file_path = ""
+        if event.data[0] == "{":
+            for char in event.data:
+                if char == "{":
+                    start_reading = True
+                    continue
+                elif char == "}":
+                    start_reading = False
+                    if file_path:
+                        files.append(file_path)
+                        file_path = ""
+                elif start_reading:
+                    file_path += char
+        
+        else:
+            files = shlex.split(event.data)
+            
+        if len(files) > 0:
+            self.import_dragged_textures(files)
+
+    
+    def import_dragged_textures(self, files):
+        #check if there's a selected xfbin
+        selection = self.xfbin_list.selection()
+        if len(selection) > 0:
+            #focus on the selected xfbin
+            index = self.xfbin_list.index(selection[0])
+            xfbin = xfbins[index]
+
+        dds_files = []
+        png_files = []
+        for file in files:
+            #check file extension
+            if file.endswith(".dds"):
+                dds_files.append(file)
+            elif file.endswith(".png"):
+                png_files.append(file)
+        
+        #pop-up asking the user if they want to import the textures as binary
+        if len(dds_files) > 0 or len(png_files) > 0:
+            if tkinter.messagebox.askyesno("Import Binary Textures", "Would you like to import the textures as binary?"):
+                
+                if len(dds_files) > 0:
+                    self.import_texture_dds(dds_files)
+                
+                if len(png_files) > 0:
+                    self.import_texture_png(png_files)
+            else:
+                for file in [dds_files + png_files]:
+                    self.import_texture_nut(file)
+
+    def open_xfbin(self, files = None):
+        if files:
+            files = files
+        else:
+            files = fd.askopenfilenames(
+                title='Select one or more XFBINs', filetypes=[("XFBIN", "*.xfbin")])
+            
         for file in files:
             filename = file.split("/")[-1][:-6]
 
@@ -298,6 +393,7 @@ class App(tkinter.Tk):
                 if not hastextures and not has_binary_textures:
                     tkinter.messagebox.showwarning("Warning", "XFBIN has no textures")
 
+        self.xfbin_list.focus(self.xfbin_list.get_children()[-1])
 
     def update_texture_chunks(self, event):
         selection = self.xfbin_list.selection()
@@ -354,6 +450,9 @@ class App(tkinter.Tk):
         # clear name and path
         self.texture_name.delete(0, tkinter.END)
         self.texture_path.delete(0, tkinter.END)
+        # clear texture preview
+        self.texture_preview.configure(image='')
+
 
     def update_name_path(self, event):
         selection = self.textures_list.selection()
@@ -533,7 +632,38 @@ class App(tkinter.Tk):
                 print(index)
                 texture = textures[index]
                 CopiedTextures.append(texture)
+    
 
+    def copy_sub_tex(self):
+        CopiedNutTextures.clear()
+        selection = [i for i in self.textures_list.selection()
+                     if self.textures_list.parent(i) != '']
+        
+        if len(selection) > 0:
+            for i in selection:
+                index = self.textures_list.index(i)
+                parent = self.textures_list.parent(i)
+                texture = textures[int(parent)]
+                CopiedNutTextures.append(texture.data.textures[index])
+    
+
+    def paste_sub_tex(self):
+        selection = self.textures_list.selection()
+        if len(selection) > 0:
+            index = self.textures_list.index(selection[0])
+            parent = self.textures_list.parent(selection[0])
+            texture = textures[int(parent)]
+            texture: Texture
+            for i, tex in enumerate(CopiedNutTextures):
+                texture.data.textures.append(tex)
+                texture.data.texture_count += 1
+                self.textures_list.insert(parent, 'end', text=f'Texture {len(texture.data.textures)}')
+            
+            self.update_texture_chunks(None)
+            #expand the parent
+            self.textures_list.item(parent, open=True)
+            #select the last texture under the parent
+            self.textures_list.selection_set(self.textures_list.get_children(parent)[-1])
     
     def paste_tex(self):
         selection = self.xfbin_list.selection()
@@ -580,6 +710,14 @@ class App(tkinter.Tk):
                 elif texture_data.pixel_format == 7:
                     image = texture_4444(texture_data.texture_data,
                                         texture_data.width, texture_data.height)
+                
+                elif texture_data.pixel_format == 5:
+                    image = texture_r8g8(texture_data.texture_data,
+                                        texture_data.width, texture_data.height)
+                
+                elif texture_data.pixel_format == 11:
+                    image = texture_r8(texture_data.texture_data,
+                                        texture_data.width, texture_data.height)
                     
                 elif texture_data.pixel_format == 14 or texture_data.pixel_format == 17:
                     image = texture_8888(texture_data.texture_data,
@@ -602,7 +740,12 @@ class App(tkinter.Tk):
             # clear the texture preview
             self.texture_preview.configure(image='')
 
-    def import_texture_nut(self):
+    def import_texture_nut(self, files = None):
+        if files:
+            files = files
+        else:
+            files = fd.askopenfilenames(title='Select one or more textures in the following formats: NUT, DDS, PNG',
+                                    filetypes=[("Images", "*.nut *.dds *.png")])
         active = self.xfbin_list.focus()
         if active == '':
             # ask the user if they want to create a new xfbin
@@ -614,6 +757,8 @@ class App(tkinter.Tk):
                 # select the new xfbin
                 self.xfbin_list.selection_set(
                     self.xfbin_list.get_children()[-1])
+                # focus on the new xfbin
+                self.xfbin_list.focus(self.xfbin_list.get_children()[-1])
 
             else:
                 return
@@ -623,9 +768,8 @@ class App(tkinter.Tk):
         '''path = fd.askopenfilename(title='Select a texture to import',
                                   filetypes=[("NUT", "*.nut")],
                                   defaultextension=".nut")'''
-        paths = fd.askopenfilenames(title='Select one or more textures in the following formats: NUT, DDS, PNG',
-                                    filetypes=[("Images", "*.nut *.dds *.png")])
-        for path in paths:
+
+        for path in files:
 
             if path != '':
                 tex_type = check_texture(path)
@@ -674,7 +818,14 @@ class App(tkinter.Tk):
                 self.textures_list.selection_set(
                     self.textures_list.get_children()[-1])
 
-    def import_texture_png(self):
+    def import_texture_png(self, files = None):
+        if files:
+            files = files
+        else:
+            files = fd.askopenfilenames(title='Select 1 or more textures to import',
+                                    filetypes=[("PNG", "*.png")],
+                                    defaultextension=".png")
+        
         active = self.xfbin_list.focus()
         if active == '':
             # ask the user if they want to create a new xfbin
@@ -687,16 +838,16 @@ class App(tkinter.Tk):
                 # select the new xfbin
                 self.xfbin_list.selection_set(
                     self.xfbin_list.get_children()[-1])
+                # focus on the new xfbin
+                self.xfbin_list.focus(self.xfbin_list.get_children()[-1])
 
             else:
                 return
         else:
             index = self.xfbin_list.index(active)
             xfbin = xfbins[index]
-        path = fd.askopenfilenames(title='Select 1 or more textures to import',
-                                  filetypes=[("PNG", "*.png")],
-                                  defaultextension=".png")
-        for filepath in path:
+
+        for filepath in files:
             if filepath != '':
                 with open(filepath, 'rb') as f:
                     file = f.read()
@@ -716,7 +867,13 @@ class App(tkinter.Tk):
                 
         
 
-    def import_texture_dds(self):
+    def import_texture_dds(self, files = None):
+        if files:
+            files = files
+        else:
+            files = fd.askopenfilenames(title='Select 1 or more textures to import',
+                                    filetypes=[("DDS", "*.dds")],
+                                    defaultextension=".dds")
         active = self.xfbin_list.focus()
         if active == '':
             # ask the user if they want to create a new xfbin
@@ -728,16 +885,16 @@ class App(tkinter.Tk):
                 # select the new xfbin
                 self.xfbin_list.selection_set(
                     self.xfbin_list.get_children()[-1])
+                # focus on the new xfbin
+                self.xfbin_list.focus(self.xfbin_list.get_children()[-1])
             else:
                 return
 
         else:
             index = self.xfbin_list.index(active)
             xfbin = xfbins[index]
-        path = fd.askopenfilenames(title='Select 1 or more textures to import',
-                                  filetypes=[("DDS", "*.dds")],
-                                  defaultextension=".dds")
-        for file in path:
+
+        for file in files:
             if file != '':
                 with open(file, 'rb') as f:
                     filedata = f.read()
